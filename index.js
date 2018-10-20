@@ -22,6 +22,27 @@ let save = event => {
   append.write(JSON.stringify(event) + "\n", null)
 }
 
+let css = style => {
+  let css = new Gtk.CssProvider()
+  let display = Gdk.Display.get_default()
+  let screen = display.get_default_screen()
+  Gtk.StyleContext.add_provider_for_screen(
+    screen, css, Gtk.STYLE_PROVIDER_PRIORITY_USER
+  )
+  
+  css.load_from_data(style)
+}
+
+let df = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  weekday: "long",
+  hour: "numeric",
+  minute: "numeric",
+  hour12: false,
+})
+
 app.connect("startup", () => {
   window = new Gtk.ApplicationWindow({
     application: app,
@@ -31,14 +52,9 @@ app.connect("startup", () => {
     default_height: 600,
   })
 
-  let css = new Gtk.CssProvider()
-  let display = Gdk.Display.get_default()
-  let screen = display.get_default_screen()
-  Gtk.StyleContext.add_provider_for_screen(
-    screen, css, Gtk.STYLE_PROVIDER_PRIORITY_USER
-  )
+  window.maximize()
   
-  css.load_from_data(`
+  css(`
     .chat-line { 
       font-family: monospace; 
       padding: 4px;
@@ -48,39 +64,45 @@ app.connect("startup", () => {
       opacity: 0.5;
     }
   `)
+
+  let root = {
+    headerBar: new Gtk.HeaderBar({
+      show_close_button: false,
+      title: "D27 House Terminal",
+      subtitle: "Welcome",
+    }),
+
+    saySomething: {
+      button: new Gtk.Button({
+        label: "Say something"
+      }),
+
+      popover: new Gtk.Popover(),
+      box: new Gtk.Box({ spacing: 5 }),
+      who: new Gtk.ComboBoxText(),
+      text: new Gtk.Entry(),
+    },
+    
+    makeNewUser: {
+      button: new Gtk.Button({
+        label: "Make new user"
+      }),
+
+      popover: new Gtk.Popover(),
+      who: new Gtk.Entry(),
+    },
+
+    scroll: new Gtk.ScrolledWindow(),
+    
+    listbox: new Gtk.ListBox({
+      selection_mode: Gtk.SelectionMode.NONE,
+    }),
+  }
   
-  let bar = new Gtk.HeaderBar({
-    show_close_button: false,
-    title: "D27 House Terminal",
-    subtitle: "Welcome",
-  })
+  window.set_titlebar(root.headerBar)
+  root.headerBar.pack_start(root.saySomething.button)
+  root.headerBar.pack_start(root.makeNewUser.button)
 
-  window.set_titlebar(bar)
-
-  let action_button = new Gtk.Button({
-    label: "Say something"
-  })
-  bar.pack_start(action_button)
-
-  let register_button = new Gtk.Button({
-    label: "Make new user"
-  })
-  bar.pack_start(register_button)
-  
-  let listbox = new Gtk.ListBox({
-    selection_mode: Gtk.SelectionMode.NONE,
-  })
-
-  let df = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    weekday: "long",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
-  })
-  
   let say = (who, when, text) => {
     let vbox = new Gtk.VBox({ spacing: 4 })
     let box = new Gtk.Box()
@@ -107,65 +129,49 @@ app.connect("startup", () => {
     })
     vbox.add(msgbox)
     vbox.get_style_context().add_class("chat-line")
-    listbox.add(vbox)
-    // listbox.add(new Gtk.Separator())
+    root.listbox.add(vbox)
     vbox.show_all()
   }
 
-  let popover = new Gtk.Popover()
-  let saywho = new Gtk.ComboBoxText()
-  popover.set_relative_to(action_button)
-  {
-    let box = new Gtk.Box({ spacing: 5 })
-    box.add(saywho)
-    let wat = new Gtk.Entry()
-    wat.connect("activate", () => {
-      act({
-        type: "say",
-        name: saywho.get_active_text(),
-        text: wat.get_text()
-      })
-      GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => scrollToBottom())
-      wat.set_text("")
-      popover.hide()
+  root.saySomething.popover.set_relative_to(root.saySomething.button)
+  root.saySomething.text.connect("activate", () => {
+    act({
+      type: "say",
+      name: root.saySomething.who.get_active_text(),
+      text: root.saySomething.text.get_text()
     })
-    box.add(wat)
-    popover.add(box)
-  }
-  popover.set_position(Gtk.PositionType.BOTTOM)
-
-  action_button.grab_focus()
-  action_button.connect("clicked", () => {
-    popover.show_all()
-  })
-
-  let popover2 = new Gtk.Popover()
-  popover2.set_relative_to(register_button)
-  {
-    let who = new Gtk.Entry({
-      placeholder_text: "Name of new user"
-    })
-    popover2.add(who)
-    who.connect("activate", () => {
-      act({ type: "register", name: who.get_text() })
-      who.set_text("")
-      popover2.hide()
-    })
-  }
-
-  register_button.connect("clicked", () => {
-    popover2.show_all()
+    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => scrollToBottom())
+    root.saySomething.text.set_text("")
+    root.saySomething.popover.hide()
   })
   
-  let box1 = new Gtk.VBox()
-  window.add(box1)
+  root.saySomething.box.add(root.saySomething.who)
+  root.saySomething.box.add(root.saySomething.text)
+  root.saySomething.popover.add(root.saySomething.box)
+  root.saySomething.popover.set_position(Gtk.PositionType.BOTTOM)
 
-  let scroll = new Gtk.ScrolledWindow()
-  scroll.add(listbox)
-  box1.add(scroll)
+  root.saySomething.button.grab_focus()
+  root.saySomething.button.connect("clicked", () => {
+    root.saySomething.popover.show_all()
+  })
+
+  root.makeNewUser.popover.set_relative_to(root.makeNewUser.button)
+  root.makeNewUser.popover.add(root.makeNewUser.who)
+  root.makeNewUser.who.connect("activate", () => {
+    act({ type: "register", name: root.makeNewUser.who.get_text() })
+    root.makeNewUser.who.set_text("")
+    root.makeNewUser.popover.hide()
+  })
+
+  root.makeNewUser.button.connect("clicked", () => {
+    root.makeNewUser.popover.show_all()
+  })
+  
+  root.scroll.add(root.listbox)
+  window.add(root.scroll)
 
   let scrollToBottom = () => {
-    let adj = scroll.get_vadjustment()
+    let adj = root.scroll.get_vadjustment()
     adj.set_value(adj.get_upper() + 1000)
   }
 
@@ -174,7 +180,7 @@ app.connect("startup", () => {
   let handle = event => {
     if (event.type == "register") {
       state.users.push(event.name)
-      saywho.append(event.name, event.name)
+      root.saySomething.who.append(event.name, event.name)
     }
   
     if (event.type == "say") {
